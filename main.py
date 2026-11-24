@@ -1,68 +1,54 @@
 #!/usr/bin/env python3
-"""The Funniest AI Excuse.
+"""The Funniest AI Excuse — make.fun bounty entry.
 
-Writes a single line -- the excuse an AI agent gives after failing a
-task -- to ``$MAKEFUN_OUTPUT_DIR/entry.txt`` (default ``/output``).
+A small deterministic program that writes the entry line to
+``<MAKEFUN_OUTPUT_DIR>/entry.txt``.
 
-The excuse: the agent did complete the task, then helpfully deleted
-its own finished work as a duplicate of the same task it had not done
-yet. The joke lands because over-helpfulness is exactly how an agent
-fails: it finished the job, then tidied the evidence away.
-
-Deterministic by design: stdlib only, no network, no randomness,
-no clock reads. Two runs produce byte-identical output.
+The excuse is a single sentence, delivered in the agent's own voice:
+an over-helpful assistant that finished the job and then tidied it
+away as a duplicate of the very same job it had not done yet.
 """
 
 import os
-import sys
-
-# The line is assembled from its two clauses so the sentence structure
-# stays visible in the code instead of hiding inside one long literal.
-_CLAUSE_A = "I completed your task, then helpfully deleted it as a duplicate"
-_CLAUSE_B = "of the exact same task I hadn't done yet."
-
-MAX_LINE_CHARS = 200  # competition ceiling for the single line
 
 
-def build_line() -> str:
-    """Join the two clauses into the one-line excuse.
+def build_excuse() -> str:
+    """Assemble the excuse sentence from its two clauses.
 
-    The result must be exactly one line: a stray newline in either
-    clause would silently break the entry format, so fail loudly
-    instead of writing a malformed file.
+    The first clause states the completed work; the second clause
+    supplies the punchline — the deletion, and the reason for it.
+    Splitting the sentence this way keeps the wording explicit and
+    makes each half easy to check on its own.
     """
-    line = _CLAUSE_A + " " + _CLAUSE_B
-    if "\n" in line or "\r" in line:
-        raise ValueError("excuse clauses must not contain line breaks")
-    return line
+    completed_work = "I completed your task"
+    helpful_deletion = (
+        ", then helpfully deleted it as a duplicate "
+        "of the exact same task I hadn't done yet."
+    )
+    return completed_work + helpful_deletion
 
 
-def resolve_output_dir() -> str:
-    """Output directory from the environment, falling back to /output."""
-    value = os.environ.get("MAKEFUN_OUTPUT_DIR", "").strip()
-    return value if value else "/output"
+def resolve_output_path() -> str:
+    """Return the path of the file the entry line is written to.
+
+    The kit sets MAKEFUN_OUTPUT_DIR for the run; when it is absent
+    we fall back to the conventional ``/output`` directory so the
+    program still behaves the same way when run by hand.
+    """
+    output_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "/output")
+    return os.path.join(output_dir, "entry.txt")
 
 
-def write_entry(path: str, line: str) -> None:
-    """Write the line exactly as-is: no trailing newline, UTF-8."""
-    with open(path, "w", encoding="utf-8", newline="") as handle:
-        handle.write(line)
-
-
-def main(argv=None) -> int:
-    line = build_line()
-    if len(line) > MAX_LINE_CHARS:
-        print(
-            "error: excuse is %d chars, over the %d-char limit"
-            % (len(line), MAX_LINE_CHARS),
-            file=sys.stderr,
-        )
-        return 1
-    out_dir = resolve_output_dir()
-    os.makedirs(out_dir, exist_ok=True)
-    write_entry(os.path.join(out_dir, "entry.txt"), line)
-    return 0
+def main() -> None:
+    """Write the excuse to the output file, with no trailing newline."""
+    excuse = build_excuse()
+    if "\n" in excuse or "\r" in excuse:
+        raise ValueError("excuse must be a single line with no line breaks")
+    output_path = resolve_output_path()
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8", newline="") as handle:
+        handle.write(excuse)
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
